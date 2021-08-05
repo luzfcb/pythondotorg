@@ -229,6 +229,13 @@ class SponsorshipBenefit(OrderedModel):
     def _short_name(self):
         return truncatechars(self.name, 42)
 
+    def name_for_display(self, package=None):
+        name = self.name
+        for feature in self.features_config.all():
+            if isinstance(feature, TieredQuantityConfiguration) and feature.package == package:
+                name = feature.display_modifier(name)
+        return name
+
     _short_name.short_description = "Benefit Name"
     short_name = property(_short_name)
 
@@ -561,6 +568,13 @@ class SponsorBenefit(OrderedModel):
             return self.sponsorship_benefit.legal_clauses.all()
         return []
 
+    @property
+    def name_for_display(self):
+        name = self.name
+        for feature in self.features.all():
+            name = feature.display_modifier(name)
+        return name
+
     class Meta(OrderedModel.Meta):
         pass
 
@@ -777,7 +791,7 @@ class Contract(models.Model):
 
         benefits_list = []
         for benefit in benefits:
-            item = f"- {benefit.program_name} - {benefit.name}"
+            item = f"- {benefit.program_name} - {benefit.name_for_display}"
             index_str = ""
             for legal_clause in benefit.legal_clauses:
                 index = legal_clauses.index(legal_clause) + 1
@@ -946,6 +960,9 @@ class BenefitFeatureConfiguration(PolymorphicModel):
         BenefitFeatureClass = self.benefit_feature_class
         return BenefitFeatureClass(**kwargs)
 
+    def display_modifier(self, name):
+        return name
+
 
 class LogoPlacementConfiguration(BaseLogoPlacement, BenefitFeatureConfiguration):
     """
@@ -985,6 +1002,9 @@ class TieredQuantityConfiguration(BaseTieredQuantity, BenefitFeatureConfiguratio
     def __str__(self):
         return f"Tiered Quantity Configuration for {self.benefit} and {self.package} ({self.quantity})"
 
+    def display_modifier(self, name):
+        return f"{name} ({self.quantity})"
+
 
 ####################################
 ##### SponsorBenefit features models
@@ -998,6 +1018,9 @@ class BenefitFeature(PolymorphicModel):
     class Meta:
         verbose_name = "Benefit Feature"
         verbose_name_plural = "Benefit Features"
+
+    def display_modifier(self, name):
+        return name
 
 
 class LogoPlacement(BaseLogoPlacement, BenefitFeature):
@@ -1021,6 +1044,9 @@ class TieredQuantity(BaseTieredQuantity, BenefitFeature):
     class Meta(BaseTieredQuantity.Meta, BenefitFeature.Meta):
         verbose_name = "Tiered Quantity"
         verbose_name_plural = "Tiered Quantities"
+
+    def display_modifier(self, name):
+        return f"{name} ({self.quantity})"
 
     def __str__(self):
         return f"{self.quantity} of {self.benefit} for {self.package}"
